@@ -3,7 +3,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."   # run from the repo root
 
-# Recursively kill a process and its children (Gradle forks a separate JVM for bootRun; npm spawns node).
+# Recursively kill a process and its children (npm spawns node; older runs used Gradle, which forked a JVM).
 kill_tree() {
   local pid=$1 child
   for child in $(pgrep -P "$pid"); do kill_tree "$child"; done
