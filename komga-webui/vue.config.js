@@ -17,6 +17,10 @@ module.exports = {
     allowedHosts: 'all',
     client: {
       webSocketURL: 'ws://0.0.0.0:8081/ws',
+      overlay: {
+        // benign browser notice, often raised by layout libraries; not a real error
+        runtimeErrors: (error) => !error?.message?.includes('ResizeObserver loop'),
+      },
     },
   },
 
