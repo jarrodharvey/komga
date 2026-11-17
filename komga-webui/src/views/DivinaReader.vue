@@ -135,6 +135,20 @@
         @jump-next="jumpToNext()"
       ></continuous-reader>
 
+      <guided-reader
+        v-else-if="guided"
+        :book-id="bookId"
+        :pages="pages"
+        :page.sync="page"
+        :reading-direction="readingDirection"
+        :animations="animations"
+        :swipe="swipe"
+        :background="backgroundColor"
+        @menu="toggleToolbars()"
+        @jump-previous="jumpToPrevious()"
+        @jump-next="jumpToNext()"
+      ></guided-reader>
+
       <paged-reader
         v-else
         :pages="pages"
@@ -234,6 +248,10 @@
             <template v-if="!continuousReader">
               <v-subheader class="font-weight-black text-h6">{{ $t('bookreader.settings.paged') }}</v-subheader>
               <v-list-item>
+                <settings-switch v-model="guided" :label="$t('bookreader.settings.guided_view')"/>
+              </v-list-item>
+
+              <v-list-item>
                 <settings-select
                   :items="scaleTypes"
                   v-model="scale"
@@ -330,6 +348,7 @@ import {ReadingDirection} from '@/types/enum-books'
 import Vue from 'vue'
 import {Location} from 'vue-router'
 import PagedReader from '@/components/readers/PagedReader.vue'
+import GuidedReader from '@/components/readers/GuidedReader.vue'
 import ContinuousReader from '@/components/readers/ContinuousReader.vue'
 import {ContinuousScaleType, MarginValues, PaddingPercentage, PagedReaderLayout, ScaleType} from '@/types/enum-reader'
 import {
@@ -353,6 +372,7 @@ export default Vue.extend({
   name: 'DivinaReader',
   components: {
     ContinuousReader,
+    GuidedReader,
     PagedReader,
     SettingsSwitch,
     SettingsSelect,
@@ -389,6 +409,7 @@ export default Vue.extend({
       goToPage: 1,
       settings: {
         pageLayout: PagedReaderLayout.SINGLE_PAGE,
+        guided: false,
         swipe: false,
         alwaysFullscreen: false,
         animations: true,
@@ -459,6 +480,7 @@ export default Vue.extend({
     this.readingDirection = this.$store.state.persistedState.webreader.readingDirection
     this.animations = this.$store.state.persistedState.webreader.animations
     this.pageLayout = this.$store.state.persistedState.webreader.paged.pageLayout
+    this.guided = this.$store.state.persistedState.webreader.paged.guided ?? false
     this.swipe = this.$store.state.persistedState.webreader.swipe
     this.alwaysFullscreen = this.$store.state.persistedState.webreader.alwaysFullscreen
     this.scale = this.$store.state.persistedState.webreader.paged.scale
@@ -641,6 +663,15 @@ export default Vue.extend({
           this.settings.pageLayout = pageLayout
           this.$store.commit('setWebreaderPagedPageLayout', pageLayout)
         }
+      },
+    },
+    guided: {
+      get: function (): boolean {
+        return this.settings.guided
+      },
+      set: function (guided: boolean): void {
+        this.settings.guided = guided
+        this.$store.commit('setWebreaderPagedGuided', guided)
       },
     },
     swipe: {
@@ -862,6 +893,11 @@ export default Vue.extend({
       this.pageLayout = enumValues[i]
       const text = this.$i18n.t(this.pageLayout)
       this.sendNotification(`${this.$t('bookreader.cycling_page_layout')}: ${text}`)
+    },
+    toggleGuided() {
+      if (this.continuousReader) return
+      this.guided = !this.guided
+      this.sendNotification(`${this.$t(this.guided ? 'bookreader.guided_view_on' : 'bookreader.guided_view_off')}`)
     },
     toggleToolbars() {
       this.showToolbars = !this.showToolbars

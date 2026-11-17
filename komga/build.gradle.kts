@@ -107,6 +107,8 @@ dependencies {
   implementation("org.jsoup:jsoup:1.23.2")
 
   implementation("net.coobird:thumbnailator:0.4.21")
+  // panel detection for guided view
+  implementation("org.openpnp:opencv:4.9.0-0")
   runtimeOnly("com.twelvemonkeys.imageio:imageio-jpeg:${libs.versions.twelvemonkeys.get()}")
   runtimeOnly("com.twelvemonkeys.imageio:imageio-tiff:${libs.versions.twelvemonkeys.get()}")
   runtimeOnly("com.twelvemonkeys.imageio:imageio-webp:${libs.versions.twelvemonkeys.get()}")

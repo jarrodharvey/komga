@@ -23,12 +23,15 @@ import org.gotson.komga.domain.persistence.SeriesMetadataRepository
 import org.gotson.komga.domain.service.BookAnalyzer
 import org.gotson.komga.domain.service.BookLifecycle
 import org.gotson.komga.infrastructure.image.ImageType
+import org.gotson.komga.infrastructure.image.PanelDetector
 import org.gotson.komga.infrastructure.mediacontainer.ContentDetector
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration
 import org.gotson.komga.infrastructure.security.KomgaPrincipal
 import org.gotson.komga.infrastructure.web.getMediaTypeOrDefault
 import org.gotson.komga.interfaces.api.dto.MEDIATYPE_PROGRESSION_JSON_VALUE
 import org.gotson.komga.interfaces.api.persistence.BookDtoRepository
+import org.gotson.komga.interfaces.api.rest.dto.PagePanelsDto
+import org.gotson.komga.interfaces.api.rest.dto.toDto
 import org.springframework.core.io.FileSystemResource
 import org.springframework.http.ContentDisposition
 import org.springframework.http.HttpHeaders
@@ -43,6 +46,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.context.request.ServletWebRequest
@@ -69,6 +73,7 @@ class CommonBookController(
   private val contentRestrictionChecker: ContentRestrictionChecker,
   private val contentDetector: ContentDetector,
   private val readProgressRepository: ReadProgressRepository,
+  private val panelDetector: PanelDetector,
 ) {
   fun getWebPubManifestInternal(
     principal: KomgaPrincipal,
@@ -221,6 +226,45 @@ class CommonBookController(
       contentRestrictionChecker.checkContentRestrictionBook(principal.user, book)
 
       getBookPageRawInternal(book, media, pageNumber)
+    } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+
+  @Operation(
+    summary = "Get book page panels",
+    description = "Returns the panels detected on the book page, in reading order. Coordinates are relative to the page dimensions. Used by the guided view reading mode.",
+    tags = [OpenApiConfiguration.TagNames.BOOK_PAGES],
+  )
+  @GetMapping(
+    value = ["api/v1/books/{bookId}/pages/{pageNumber}/panels"],
+    produces = [MediaType.APPLICATION_JSON_VALUE],
+  )
+  @PreAuthorize("hasRole('PAGE_STREAMING')")
+  fun getBookPagePanels(
+    @AuthenticationPrincipal principal: KomgaPrincipal,
+    @PathVariable bookId: String,
+    @PathVariable pageNumber: Int,
+    @RequestParam(name = "readingDirection", required = false) readingDirection: String?,
+  ): PagePanelsDto =
+    bookRepository.findByIdOrNull(bookId)?.let { book ->
+      contentRestrictionChecker.checkContentRestrictionBook(principal.user, book)
+      val media = mediaRepository.findById(bookId)
+      if (pageNumber < 1 || pageNumber > media.pageCount) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Page number does not exist")
+      val rightToLeft = readingDirection.equals("RIGHT_TO_LEFT", ignoreCase = true)
+
+      try {
+        panelDetector
+          .getPanels("$bookId:$pageNumber:${getBookLastModified(media)}", rightToLeft) {
+            bookLifecycle.getBookPage(book, pageNumber).bytes
+          }.toDto()
+      } catch (_: IndexOutOfBoundsException) {
+        throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Page number does not exist")
+      } catch (ex: MediaUnsupportedException) {
+        throw ResponseStatusException(HttpStatus.BAD_REQUEST, ex.message)
+      } catch (_: MediaNotReadyException) {
+        throw ResponseStatusException(HttpStatus.NOT_FOUND, "Book analysis failed")
+      } catch (ex: NoSuchFileException) {
+        logger.warn(ex) { "File not found: $book" }
+        throw ResponseStatusException(HttpStatus.NOT_FOUND, "File not found, it may have moved")
+      }
     } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
 
   fun getBookPageRawInternal(

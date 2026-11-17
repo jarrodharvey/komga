@@ -43,6 +43,19 @@ export interface PageDto {
   size: string,
 }
 
+export interface PanelRectDto {
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+}
+
+export interface PagePanelsDto {
+  width: number,
+  height: number,
+  panels: PanelRectDto[],
+}
+
 export interface PageDtoWithUrl {
   number: number,
   fileName: string,

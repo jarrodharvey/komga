@@ -37,4 +37,7 @@ export const shortcutsSettingsPaged = [
   new Shortcut('bookreader.shortcuts.cycle_page_layout',
     (ctx: any) => ctx.cyclePageLayout()
     , 'd'),
+  new Shortcut('bookreader.shortcuts.toggle_guided_view',
+    (ctx: any) => ctx.toggleGuided()
+    , 'g'),
 ]

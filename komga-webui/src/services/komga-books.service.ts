@@ -6,6 +6,7 @@ import {
   BookMetadataUpdateDto,
   BookThumbnailDto,
   PageDto,
+  PagePanelsDto,
   ReadProgressUpdateDto,
 } from '@/types/komga-books'
 import {ReadListDto} from '@/types/komga-readlists'
@@ -114,6 +115,19 @@ export default class KomgaBooksService {
     } catch (e) {
       let msg = 'An error occurred while trying to retrieve book pages'
       if (e.response.data.message) {
+        msg += `: ${e.response.data.message}`
+      }
+      throw new Error(msg)
+    }
+  }
+
+  async getPagePanels(bookId: string, page: number, readingDirection?: string): Promise<PagePanelsDto> {
+    try {
+      const params = readingDirection ? {readingDirection} : {}
+      return (await this.http.get(`${API_BOOKS}/${bookId}/pages/${page}/panels`, {params})).data
+    } catch (e) {
+      let msg = 'An error occurred while trying to retrieve page panels'
+      if (e.response?.data?.message) {
         msg += `: ${e.response.data.message}`
       }
       throw new Error(msg)
