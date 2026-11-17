@@ -419,6 +419,7 @@ import {
   countWords,
   stepDuration,
 } from '@/functions/auto-advance'
+import {KeepAwake} from '@/functions/keep-awake'
 import {Context, ContextOrigin} from '@/types/context'
 import {SeriesDto} from '@/types/komga-series'
 import jsFileDownloader from 'js-file-downloader'
@@ -489,6 +490,8 @@ export default Vue.extend({
       // restarts the countdown bar
       autoGeneration: 0,
       pageHidden: document.hidden,
+      // keeps the screen on while auto-advancing
+      screenLock: null as KeepAwake | null,
       ocr: null as BookOcrDto | null,
       ocrRequest: 0,
       autoPageTimes: [2, 3, 4, 5, 6, 8, 10, 15].map(x => ({
@@ -555,6 +558,9 @@ export default Vue.extend({
     window.addEventListener('keydown', this.keyPressed)
     document.addEventListener('visibilitychange', this.visibilityChanged)
     if (screenfull.isEnabled) screenfull.on('change', this.fullscreenChanged)
+    this.screenLock = new KeepAwake()
+    // synchronous, so a tap on the auto-advance toggle is still the user gesture that iOS needs to start the video fallback
+    this.$watch(() => this.keepAwake, (val: boolean) => this.screenLock?.set(val), {sync: true} as any)
   },
   async mounted() {
     document.documentElement.classList.add('html-reader')
@@ -583,6 +589,8 @@ export default Vue.extend({
     window.removeEventListener('keydown', this.keyPressed)
     document.removeEventListener('visibilitychange', this.visibilityChanged)
     this.stopAutoTimer()
+    this.screenLock?.destroy()
+    this.screenLock = null
     if (screenfull.isEnabled) {
       screenfull.off('change', this.fullscreenChanged)
       screenfull.exit()
@@ -760,6 +768,10 @@ export default Vue.extend({
     autoRunning(): boolean {
       return this.autoAdvance.enabled && !this.autoPaused && !this.continuousReader && this.autoStep !== null
         && !this.showToolbars && !this.showSettings && !this.showExplorer && !this.showHelp && !this.pageHidden
+    },
+    // whether to keep the screen on: while auto-advance is on and not paused, menus open or not
+    keepAwake(): boolean {
+      return this.autoAdvance.enabled && !this.autoPaused && !this.continuousReader
     },
     autoAdvanceEnabled: {
       get: function (): boolean {
