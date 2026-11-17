@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Start the Komga backend in the background (dev profile, in-memory DB, default users).
-# Usage: personal-scripts/start-server.sh [profiles]   e.g. personal-scripts/start-server.sh dev,localdb,noclaim
+# Start the Komga backend in the background (dev profile, file-based DB in config-dir/ so data persists, default users).
+# Usage: personal-scripts/start-server.sh [profiles]   e.g. personal-scripts/start-server.sh dev,noclaim  (in-memory DB, wiped on restart)
 set -euo pipefail
 cd "$(dirname "$0")/.."   # run from the repo root
 
-PROFILES="${1:-dev,noclaim}"
+PROFILES="${1:-dev,localdb,noclaim}"
 PID_FILE=".komga-server.pid"
 LOG_FILE="komga-server.log"
 # The dev profile listens on 8080 (application-dev.yml); otherwise 25600.
