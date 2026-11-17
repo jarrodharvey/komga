@@ -63,3 +63,4 @@ secret/
 
 ### Local server scripts
 .komga-server.pid
+.komga-webui.pid
