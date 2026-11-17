@@ -103,6 +103,9 @@ class DataSourcesConfiguration(
         this.dataSource = dataSource
         this.poolName = poolName
         this.maximumPoolSize = poolSize
+        // an in-memory database only lives as long as its connection:
+        // never retire it, else the replacement connection would get a new, empty database
+        if (databaseProps.isMemory()) this.maxLifetime = 0
       },
     )
   }
