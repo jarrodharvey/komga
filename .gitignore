@@ -60,3 +60,6 @@ secret/
 
 ### Kilo
 /.kilo/
+
+### Local server scripts
+.komga-server.pid
