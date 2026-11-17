@@ -26,6 +26,13 @@ module.exports = {
 
   // custom rule for readium and r2d2bc css that needs to be made available, but untouched
   configureWebpack: {
+    // the d-i-t-a reader bundle contains esbuild's dynamic `require` shim, which webpack flags but is harmless
+    ignoreWarnings: [
+      {
+        module: /node_modules[\\/]@d-i-t-a[\\/]reader[\\/]/,
+        message: /Critical dependency: require function is used in a way/,
+      },
+    ],
     module: {
       rules: [
         {
