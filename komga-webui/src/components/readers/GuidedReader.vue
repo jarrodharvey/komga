@@ -73,6 +73,7 @@ import Vue from 'vue'
 import {ReadingDirection} from '@/types/enum-books'
 import {shortcutsLTR, shortcutsRTL, shortcutsVertical} from '@/functions/shortcuts/paged-reader'
 import {PageDtoWithUrl, PanelRectDto} from '@/types/komga-books'
+import {AutoAdvanceStep} from '@/functions/auto-advance'
 
 const FULL_PAGE: PanelRectDto = {x: 0, y: 0, width: 1, height: 1}
 // fraction of the viewport left around a zoomed panel
@@ -143,6 +144,9 @@ export default Vue.extend({
     bookId() {
       this.panels = {}
     },
+    autoStep(val: AutoAdvanceStep | null, old: AutoAdvanceStep | null) {
+      if (val?.key !== old?.key) this.$emit('step', val)
+    },
     readingDirection() {
       // panel order depends on the reading direction
       this.panels = {}
@@ -158,6 +162,7 @@ export default Vue.extend({
   destroyed() {
     window.removeEventListener('keydown', this.keyPressed)
     window.removeEventListener('resize', this.onResize)
+    this.$emit('step', null)
   },
   computed: {
     shortcuts(): any {
@@ -220,6 +225,17 @@ export default Vue.extend({
         height: this.natural.height ? `${this.natural.height}px` : undefined,
         transform: `translate(${t.x}px, ${t.y}px) scale(${t.scale})`,
         visibility: this.imageReady && this.currentLoaded ? 'visible' : 'hidden',
+      }
+    },
+    // what is on screen, for auto-advance. Null while the page or its panels are loading.
+    autoStep(): AutoAdvanceStep | null {
+      if (!this.currentPage || !this.currentLoaded || !this.imageReady) return null
+      const panelIndex = this.steps.length > 0 ? this.panelIndex : undefined
+      return {
+        key: `${this.currentPage.url}#${panelIndex ?? 'page'}`,
+        pages: [this.currentPage.number],
+        panels: this.steps.length > 0 ? this.steps : undefined,
+        panelIndex: panelIndex,
       }
     },
     maskStyle(): object {

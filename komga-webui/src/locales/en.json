@@ -92,6 +92,10 @@
     "try_another_directory": "Try searching another directory"
   },
   "bookreader": {
+    "auto_advance_off": "Auto-advance disabled",
+    "auto_advance_on": "Auto-advance enabled",
+    "auto_advance_paused": "Auto-advance paused",
+    "auto_advance_resumed": "Auto-advance resumed",
     "beginning_of_book": "You're at the beginning of the book.",
     "changing_reading_direction": "Changing Reading Direction to",
     "cycling_page_layout": "Cycling Page Layout",
@@ -129,6 +133,12 @@
     "set_current_page_as_series_poster": "Set page as poster for series",
     "settings": {
       "always_fullscreen": "Always Full Screen",
+      "auto_advance": "Auto-advance (timed by the amount of text)",
+      "auto_advance_page_time": "Time per page, plus reading time",
+      "auto_advance_panel_time": "Time per panel in guided view, plus reading time",
+      "auto_advance_reading_speed": "Reading speed",
+      "auto_advance_seconds": "{count} s",
+      "auto_advance_wpm": "{count} words per minute",
       "animate_page_transitions": "Animate page transitions",
       "background_color": "Background color",
       "background_colors": {
@@ -153,6 +163,8 @@
       "close": "Close",
       "cycle_page_layout": "Cycle page layout",
       "toggle_guided_view": "Toggle guided view",
+      "toggle_auto_advance": "Toggle auto-advance",
+      "pause_auto_advance": "Pause/resume auto-advance",
       "cycle_scale": "Cycle scale",
       "cycle_page_margin": "Cycle page margin",
       "cycle_side_padding": "Cycle side padding",

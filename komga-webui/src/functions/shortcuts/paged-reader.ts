@@ -40,4 +40,10 @@ export const shortcutsSettingsPaged = [
   new Shortcut('bookreader.shortcuts.toggle_guided_view',
     (ctx: any) => ctx.toggleGuided()
     , 'g'),
+  new Shortcut('bookreader.shortcuts.toggle_auto_advance',
+    (ctx: any) => ctx.toggleAutoAdvance()
+    , 'a'),
+  new Shortcut('bookreader.shortcuts.pause_auto_advance',
+    (ctx: any) => ctx.pauseAutoAdvance()
+    , ' ', 'SPACE'),
 ]

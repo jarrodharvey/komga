@@ -82,6 +82,7 @@ import {PagedReaderLayout, ScaleType} from '@/types/enum-reader'
 import {shortcutsLTR, shortcutsRTL, shortcutsVertical} from '@/functions/shortcuts/paged-reader'
 import {PageDtoWithUrl} from '@/types/komga-books'
 import {buildSpreads} from '@/functions/book-spreads'
+import {AutoAdvanceStep} from '@/functions/auto-advance'
 
 export default Vue.extend({
   name: 'PagedReader',
@@ -145,6 +146,12 @@ export default Vue.extend({
       this.$debug('[watch:page]', `toSpreadIndex:${spreadIndex}`)
       this.carouselPage = spreadIndex
     },
+    autoStep: {
+      handler(val: AutoAdvanceStep | null, old: AutoAdvanceStep | null) {
+        if (val?.key !== old?.key) this.$emit('step', val)
+      },
+      immediate: true,
+    },
     pageLayout: {
       handler(val) {
         const current = this.page
@@ -159,6 +166,7 @@ export default Vue.extend({
   },
   destroyed() {
     window.removeEventListener('keydown', this.keyPressed)
+    this.$emit('step', null)
   },
   computed: {
     shortcuts(): any {
@@ -193,6 +201,17 @@ export default Vue.extend({
     },
     canNext(): boolean {
       return this.currentSlide < this.slidesCount
+    },
+    // what is on screen, for auto-advance
+    autoStep(): AutoAdvanceStep | null {
+      const spread = this.spreads[this.carouselPage]
+      if (!spread || spread.length === 0) return null
+      // spreads can hold a blank filler page, numbered 0
+      const pages = spread.filter(p => p.number > 0)
+      return {
+        key: pages.map(p => p.url).join('|'),
+        pages: pages.map(p => p.number),
+      }
     },
     isDoublePages(): boolean {
       return this.pageLayout === PagedReaderLayout.DOUBLE_PAGES || this.pageLayout === PagedReaderLayout.DOUBLE_NO_COVER

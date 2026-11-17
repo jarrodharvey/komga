@@ -28,6 +28,15 @@
           </v-tooltip>
 
           <v-btn
+            v-if="!continuousReader"
+            icon
+            @click="toggleAutoAdvance"
+            :title="$t('bookreader.shortcuts.toggle_auto_advance')"
+          >
+            <v-icon>{{ autoAdvanceEnabled ? 'mdi-timer-off-outline' : 'mdi-timer-play-outline' }}</v-icon>
+          </v-btn>
+
+          <v-btn
             icon
             :disabled="!screenfull.isEnabled"
             @click="screenfull.isFullscreen ? screenfull.exit() : enterFullscreen()">
@@ -144,6 +153,8 @@
         :animations="animations"
         :swipe="swipe"
         :background="backgroundColor"
+        ref="reader"
+        @step="onAutoStep"
         @menu="toggleToolbars()"
         @jump-previous="jumpToPrevious()"
         @jump-next="jumpToNext()"
@@ -158,11 +169,23 @@
         :scale="scale"
         :animations="animations"
         :swipe="swipe"
+        ref="reader"
+        @step="onAutoStep"
         @menu="toggleToolbars()"
         @jump-previous="jumpToPrevious()"
         @jump-next="jumpToNext()"
       ></paged-reader>
     </div>
+
+    <!--  auto-advance countdown  -->
+    <div v-if="autoAdvanceEnabled && autoStep && !continuousReader"
+         :key="`auto-${autoGeneration}`"
+         class="auto-progress"
+         data-testid="auto-progress"
+         :data-duration="autoDuration"
+         :data-running="autoRunning"
+         :style="{animationDuration: `${autoDuration}ms`, animationPlayState: autoRunning ? 'running' : 'paused'}"
+    />
 
     <thumbnail-explorer-dialog
       v-model="showExplorer"
@@ -250,6 +273,34 @@
               <v-list-item>
                 <settings-switch v-model="guided" :label="$t('bookreader.settings.guided_view')"/>
               </v-list-item>
+
+              <v-list-item>
+                <settings-switch v-model="autoAdvanceEnabled" :label="$t('bookreader.settings.auto_advance')"/>
+              </v-list-item>
+
+              <template v-if="autoAdvanceEnabled">
+                <v-list-item>
+                  <settings-select
+                    :items="autoPageTimes"
+                    v-model="autoPageBaseline"
+                    :label="$t('bookreader.settings.auto_advance_page_time')"
+                  />
+                </v-list-item>
+                <v-list-item>
+                  <settings-select
+                    :items="autoPanelTimes"
+                    v-model="autoPanelBaseline"
+                    :label="$t('bookreader.settings.auto_advance_panel_time')"
+                  />
+                </v-list-item>
+                <v-list-item>
+                  <settings-select
+                    :items="autoReadingSpeeds"
+                    v-model="autoWordsPerMinute"
+                    :label="$t('bookreader.settings.auto_advance_reading_speed')"
+                  />
+                </v-list-item>
+              </template>
 
               <v-list-item>
                 <settings-select
@@ -360,7 +411,14 @@ import {
 import {shortcutsMenus, shortcutsSettings} from '@/functions/shortcuts/bookreader'
 import {shortcutsAll} from '@/functions/shortcuts/reader'
 import {shortcutsSettingsContinuous} from '@/functions/shortcuts/continuous-reader'
-import {BookDto, PageDto, PageDtoWithUrl} from '@/types/komga-books'
+import {BookDto, BookOcrDto, PageDto, PageDtoWithUrl} from '@/types/komga-books'
+import {
+  AUTO_ADVANCE_DEFAULTS,
+  AutoAdvanceSettings,
+  AutoAdvanceStep,
+  countWords,
+  stepDuration,
+} from '@/functions/auto-advance'
 import {Context, ContextOrigin} from '@/types/context'
 import {SeriesDto} from '@/types/komga-series'
 import jsFileDownloader from 'js-file-downloader'
@@ -420,6 +478,31 @@ export default Vue.extend({
         readingDirection: ReadingDirection.LEFT_TO_RIGHT,
         backgroundColor: 'black',
       },
+      // auto-advance: the step on screen, its total and remaining time, and the pending timer
+      autoAdvance: {...AUTO_ADVANCE_DEFAULTS} as AutoAdvanceSettings,
+      autoPaused: false,
+      autoStep: null as AutoAdvanceStep | null,
+      autoDuration: 0,
+      autoRemaining: 0,
+      autoTimer: undefined as number | undefined,
+      autoStartedAt: 0,
+      // restarts the countdown bar
+      autoGeneration: 0,
+      pageHidden: document.hidden,
+      ocr: null as BookOcrDto | null,
+      ocrRequest: 0,
+      autoPageTimes: [2, 3, 4, 5, 6, 8, 10, 15].map(x => ({
+        text: this.$t('bookreader.settings.auto_advance_seconds', {count: x}).toString(),
+        value: x * 1000,
+      })),
+      autoPanelTimes: [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8].map(x => ({
+        text: this.$t('bookreader.settings.auto_advance_seconds', {count: x}).toString(),
+        value: x * 1000,
+      })),
+      autoReadingSpeeds: [100, 125, 150, 175, 200, 225, 250, 275, 300, 350, 400].map(x => ({
+        text: this.$t('bookreader.settings.auto_advance_wpm', {count: x}).toString(),
+        value: x,
+      })),
       shortcuts: {} as any,
       notification: {
         enabled: false,
@@ -470,6 +553,7 @@ export default Vue.extend({
     })
     this.shortcuts = this.$_.keyBy([...shortcutsSettings, ...shortcutsSettingsPaged, ...shortcutsSettingsContinuous, ...shortcutsMenus, ...shortcutsAll], x => x.key)
     window.addEventListener('keydown', this.keyPressed)
+    document.addEventListener('visibilitychange', this.visibilityChanged)
     if (screenfull.isEnabled) screenfull.on('change', this.fullscreenChanged)
   },
   async mounted() {
@@ -481,6 +565,7 @@ export default Vue.extend({
     this.animations = this.$store.state.persistedState.webreader.animations
     this.pageLayout = this.$store.state.persistedState.webreader.paged.pageLayout
     this.guided = this.$store.state.persistedState.webreader.paged.guided ?? false
+    this.autoAdvance = {...AUTO_ADVANCE_DEFAULTS, ...this.$store.state.persistedState.webreader.paged.autoAdvance}
     this.swipe = this.$store.state.persistedState.webreader.swipe
     this.alwaysFullscreen = this.$store.state.persistedState.webreader.alwaysFullscreen
     this.scale = this.$store.state.persistedState.webreader.paged.scale
@@ -496,6 +581,8 @@ export default Vue.extend({
 
     this.$vuetify.rtl = (this.$t('common.locale_rtl') === 'true')
     window.removeEventListener('keydown', this.keyPressed)
+    document.removeEventListener('visibilitychange', this.visibilityChanged)
+    this.stopAutoTimer()
     if (screenfull.isEnabled) {
       screenfull.off('change', this.fullscreenChanged)
       screenfull.exit()
@@ -518,6 +605,10 @@ export default Vue.extend({
     next()
   },
   watch: {
+    autoRunning(val: boolean) {
+      if (val) this.startAutoTimer()
+      else this.stopAutoTimer()
+    },
     page: {
       handler(val, old) {
         if (val) {
@@ -665,6 +756,44 @@ export default Vue.extend({
         }
       },
     },
+    // whether the auto-advance countdown is ticking. It stops while menus are open or the tab is hidden.
+    autoRunning(): boolean {
+      return this.autoAdvance.enabled && !this.autoPaused && !this.continuousReader && this.autoStep !== null
+        && !this.showToolbars && !this.showSettings && !this.showExplorer && !this.showHelp && !this.pageHidden
+    },
+    autoAdvanceEnabled: {
+      get: function (): boolean {
+        return this.autoAdvance.enabled
+      },
+      set: function (enabled: boolean): void {
+        this.autoPaused = false
+        this.setAutoAdvance({enabled})
+      },
+    },
+    autoPageBaseline: {
+      get: function (): number {
+        return this.autoAdvance.pageBaselineMs
+      },
+      set: function (pageBaselineMs: number): void {
+        this.setAutoAdvance({pageBaselineMs})
+      },
+    },
+    autoPanelBaseline: {
+      get: function (): number {
+        return this.autoAdvance.panelBaselineMs
+      },
+      set: function (panelBaselineMs: number): void {
+        this.setAutoAdvance({panelBaselineMs})
+      },
+    },
+    autoWordsPerMinute: {
+      get: function (): number {
+        return this.autoAdvance.wordsPerMinute
+      },
+      set: function (wordsPerMinute: number): void {
+        this.setAutoAdvance({wordsPerMinute})
+      },
+    },
     guided: {
       get: function (): boolean {
         return this.settings.guided
@@ -735,6 +864,9 @@ export default Vue.extend({
       // parse query params to get incognito mode
       this.incognito = !!(this.$route.query.incognito && this.$route.query.incognito.toString().toLowerCase() === 'true')
 
+      this.onAutoStep(null)
+      this.loadOcr(bookId)
+
       const pageDtos = (await this.$komgaBooks.getBookPages(bookId))
       pageDtos.forEach((p: any) => p['url'] = this.getPageUrl(p))
       this.pages = pageDtos as PageDtoWithUrl[]
@@ -799,6 +931,7 @@ export default Vue.extend({
     },
     previousBook() {
       if (!this.$_.isEmpty(this.siblingPrevious)) {
+        this.onAutoStep(null)
         this.jumpToPreviousBook = false
         this.$router.push({
           name: getBookReadRouteFromMedia(this.siblingPrevious.media),
@@ -811,6 +944,7 @@ export default Vue.extend({
       if (this.$_.isEmpty(this.siblingNext)) {
         this.closeBook()
       } else {
+        this.onAutoStep(null)
         this.jumpToNextBook = false
         this.$router.push({
           name: getBookReadRouteFromMedia(this.siblingNext.media),
@@ -899,6 +1033,88 @@ export default Vue.extend({
       this.guided = !this.guided
       this.sendNotification(`${this.$t(this.guided ? 'bookreader.guided_view_on' : 'bookreader.guided_view_off')}`)
     },
+    async loadOcr(bookId: string) {
+      const request = ++this.ocrRequest
+      this.ocr = null
+      try {
+        const ocr = await this.$komgaBooks.getBookOcr(bookId)
+        if (request !== this.ocrRequest) return
+        this.ocr = ocr
+        this.$debug('[loadOcr]', `bookId:${bookId}`, ocr ? `pages:${ocr.pages.length}` : 'none')
+        // time the current step again, now that its words are known
+        if (this.autoStep) this.onAutoStep(this.autoStep)
+      } catch (e) {
+        this.$debug('[loadOcr]', e)
+      }
+    },
+    setAutoAdvance(change: Partial<AutoAdvanceSettings>) {
+      this.autoAdvance = {...this.autoAdvance, ...change}
+      this.$store.commit('setWebreaderPagedAutoAdvance', this.autoAdvance)
+      if (this.autoStep && change.enabled === undefined) this.onAutoStep(this.autoStep)
+    },
+    // called by the readers whenever they show another page, spread or panel
+    onAutoStep(step: AutoAdvanceStep | null) {
+      this.stopAutoTimer()
+      this.autoStep = step
+      if (step) {
+        const words = countWords(this.ocr, step)
+        this.autoDuration = stepDuration(words, step, this.autoAdvance)
+        this.autoRemaining = this.autoDuration
+        this.autoGeneration++
+        this.$debug('[onAutoStep]', step.key, `words:${words}`, `duration:${this.autoDuration}`)
+      }
+      this.startAutoTimer()
+    },
+    startAutoTimer() {
+      if (this.autoTimer !== undefined || !this.autoRunning) return
+      this.autoStartedAt = Date.now()
+      this.autoTimer = window.setTimeout(this.autoFire, Math.max(0, this.autoRemaining))
+    },
+    stopAutoTimer() {
+      if (this.autoTimer === undefined) return
+      window.clearTimeout(this.autoTimer)
+      this.autoTimer = undefined
+      this.autoRemaining = Math.max(0, this.autoRemaining - (Date.now() - this.autoStartedAt))
+    },
+    autoFire() {
+      this.autoTimer = undefined
+      this.autoRemaining = 0
+      const key = this.autoStep?.key
+      ;(this.$refs.reader as any)?.next()
+      this.$nextTick(() => {
+        // the reader moved on, and will report its next step
+        if (this.autoStep?.key !== key) return
+        if (this.jumpToNextBook) {
+          // end of the book: confirm the jump to the next book before the confirmation expires, or stop there
+          if (this.$_.isEmpty(this.siblingNext)) {
+            this.autoPaused = true
+            return
+          }
+          this.autoRemaining = Math.min(2000, this.jumpConfirmationDelay - 500)
+        } else {
+          // the reader was not ready, try again shortly
+          this.autoRemaining = 500
+        }
+        this.startAutoTimer()
+      })
+    },
+    toggleAutoAdvance() {
+      if (this.continuousReader) return
+      this.autoAdvanceEnabled = !this.autoAdvanceEnabled
+      this.sendNotification(`${this.$t(this.autoAdvanceEnabled ? 'bookreader.auto_advance_on' : 'bookreader.auto_advance_off')}`, 1500)
+    },
+    pauseAutoAdvance() {
+      if (this.continuousReader) return
+      if (!this.autoAdvanceEnabled) {
+        this.toggleAutoAdvance()
+        return
+      }
+      this.autoPaused = !this.autoPaused
+      this.sendNotification(`${this.$t(this.autoPaused ? 'bookreader.auto_advance_paused' : 'bookreader.auto_advance_resumed')}`, 1500)
+    },
+    visibilityChanged() {
+      this.pageHidden = document.hidden
+    },
     toggleToolbars() {
       this.showToolbars = !this.showToolbars
     },
@@ -973,6 +1189,30 @@ export default Vue.extend({
 <style scoped>
 .settings {
   z-index: 2;
+}
+
+.auto-progress {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 3px;
+  z-index: 1;
+  pointer-events: none;
+  background-color: rgba(128, 128, 128, 0.6);
+  transform-origin: left;
+  animation-name: auto-advance-countdown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes auto-advance-countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
 }
 
 .full-height {

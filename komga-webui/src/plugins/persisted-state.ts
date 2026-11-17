@@ -10,6 +10,8 @@ export const persistedModule: Module<any, any> = {
         scale: '',
         pageLayout: '',
         guided: false,
+        // see AutoAdvanceSettings
+        autoAdvance: {},
       },
       continuous: {
         scale: '',
@@ -109,6 +111,9 @@ export const persistedModule: Module<any, any> = {
     },
     setWebreaderPagedGuided(state, val) {
       state.webreader.paged.guided = val
+    },
+    setWebreaderPagedAutoAdvance(state, val) {
+      state.webreader.paged.autoAdvance = val
     },
     setWebreaderContinuousScale(state, val) {
       state.webreader.continuous.scale = val

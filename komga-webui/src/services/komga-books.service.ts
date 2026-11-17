@@ -4,6 +4,7 @@ import {
   BookImportBatchDto,
   BookMetadataUpdateBatchDto,
   BookMetadataUpdateDto,
+  BookOcrDto,
   BookThumbnailDto,
   PageDto,
   PagePanelsDto,
@@ -127,6 +128,20 @@ export default class KomgaBooksService {
       return (await this.http.get(`${API_BOOKS}/${bookId}/pages/${page}/panels`, {params})).data
     } catch (e) {
       let msg = 'An error occurred while trying to retrieve page panels'
+      if (e.response?.data?.message) {
+        msg += `: ${e.response.data.message}`
+      }
+      throw new Error(msg)
+    }
+  }
+
+  // OCR made offline by personal-scripts/ocr, or null when the book has none
+  async getBookOcr(bookId: string): Promise<BookOcrDto | null> {
+    try {
+      return (await this.http.get(`${API_BOOKS}/${bookId}/ocr`)).data
+    } catch (e) {
+      if (e.response?.status === 404) return null
+      let msg = 'An error occurred while trying to retrieve book OCR'
       if (e.response?.data?.message) {
         msg += `: ${e.response.data.message}`
       }

@@ -25,11 +25,13 @@ import org.gotson.komga.domain.service.BookLifecycle
 import org.gotson.komga.infrastructure.image.ImageType
 import org.gotson.komga.infrastructure.image.PanelDetector
 import org.gotson.komga.infrastructure.mediacontainer.ContentDetector
+import org.gotson.komga.infrastructure.ocr.BookOcrStore
 import org.gotson.komga.infrastructure.openapi.OpenApiConfiguration
 import org.gotson.komga.infrastructure.security.KomgaPrincipal
 import org.gotson.komga.infrastructure.web.getMediaTypeOrDefault
 import org.gotson.komga.interfaces.api.dto.MEDIATYPE_PROGRESSION_JSON_VALUE
 import org.gotson.komga.interfaces.api.persistence.BookDtoRepository
+import org.gotson.komga.interfaces.api.rest.dto.BookOcrDto
 import org.gotson.komga.interfaces.api.rest.dto.PagePanelsDto
 import org.gotson.komga.interfaces.api.rest.dto.toDto
 import org.springframework.core.io.FileSystemResource
@@ -74,6 +76,7 @@ class CommonBookController(
   private val contentDetector: ContentDetector,
   private val readProgressRepository: ReadProgressRepository,
   private val panelDetector: PanelDetector,
+  private val bookOcrStore: BookOcrStore,
 ) {
   fun getWebPubManifestInternal(
     principal: KomgaPrincipal,
@@ -265,6 +268,26 @@ class CommonBookController(
         logger.warn(ex) { "File not found: $book" }
         throw ResponseStatusException(HttpStatus.NOT_FOUND, "File not found, it may have moved")
       }
+    } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+
+  @Operation(
+    summary = "Get book OCR",
+    description = "Returns the word boxes recognized by OCR on each page of the book, with coordinates relative to the page dimensions. Used by the reader's auto-advance to time pages and panels. OCR is produced offline by personal-scripts/ocr.",
+    tags = [OpenApiConfiguration.TagNames.BOOK_PAGES],
+  )
+  @GetMapping(
+    value = ["api/v1/books/{bookId}/ocr"],
+    produces = [MediaType.APPLICATION_JSON_VALUE],
+  )
+  @PreAuthorize("hasRole('PAGE_STREAMING')")
+  fun getBookOcr(
+    @AuthenticationPrincipal principal: KomgaPrincipal,
+    @PathVariable bookId: String,
+  ): BookOcrDto =
+    bookRepository.findByIdOrNull(bookId)?.let { book ->
+      contentRestrictionChecker.checkContentRestrictionBook(principal.user, book)
+      val media = mediaRepository.findById(bookId)
+      bookOcrStore.find(book, media)?.toDto() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No OCR for this book")
     } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
 
   fun getBookPageRawInternal(

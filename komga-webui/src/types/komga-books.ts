@@ -56,6 +56,23 @@ export interface PagePanelsDto {
   panels: PanelRectDto[],
 }
 
+export interface OcrWordDto {
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  conf: number,
+}
+
+export interface PageOcrDto {
+  number: number,
+  words: OcrWordDto[],
+}
+
+export interface BookOcrDto {
+  pages: PageOcrDto[],
+}
+
 export interface PageDtoWithUrl {
   number: number,
   fileName: string,
