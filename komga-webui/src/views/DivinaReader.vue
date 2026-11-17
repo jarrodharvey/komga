@@ -30,7 +30,7 @@
           <v-btn
             v-if="!continuousReader"
             icon
-            @click="toggleAutoAdvance(); showToolbars = false"
+            @click="toggleAutoAdvance"
             :title="$t('bookreader.shortcuts.toggle_auto_advance')"
           >
             <v-icon>{{ autoAdvanceEnabled ? 'mdi-timer-off-outline' : 'mdi-timer-play-outline' }}</v-icon>
@@ -756,11 +756,10 @@ export default Vue.extend({
         }
       },
     },
-    // whether the auto-advance countdown is ticking. It stops while dialogs are open or the tab is hidden,
-    // but keeps going with the toolbars shown, so that it doesn't take an extra tap to get going.
+    // whether the auto-advance countdown is ticking. It stops while menus are open or the tab is hidden.
     autoRunning(): boolean {
       return this.autoAdvance.enabled && !this.autoPaused && !this.continuousReader && this.autoStep !== null
-        && !this.showSettings && !this.showExplorer && !this.showHelp && !this.pageHidden
+        && !this.showToolbars && !this.showSettings && !this.showExplorer && !this.showHelp && !this.pageHidden
     },
     autoAdvanceEnabled: {
       get: function (): boolean {
