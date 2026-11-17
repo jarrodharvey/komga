@@ -902,6 +902,7 @@ export default Vue.extend({
     markProgress: debounce(function (this: any, page: number) {
       if (!this.incognito) {
         this.$komgaBooks.updateReadProgress(this.bookId, {page: page})
+          .catch((e: Error) => this.$debug('[markProgress]', e.message))
       }
     }, 50),
     downloadCurrentPage() {

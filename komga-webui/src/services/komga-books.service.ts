@@ -185,7 +185,7 @@ export default class KomgaBooksService {
       await this.http.patch(`${API_BOOKS}/${bookId}/read-progress`, readProgress)
     } catch (e) {
       let msg = 'An error occurred while trying to update read progress'
-      if (e.response.data.message) {
+      if (e.response?.data?.message) {
         msg += `: ${e.response.data.message}`
       }
       throw new Error(msg)
